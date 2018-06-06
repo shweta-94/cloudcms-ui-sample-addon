@@ -5,7 +5,7 @@ define(function(require, exports, module) {
     var $ = require("jquery");
     var OneTeam = require("oneteam");
 
-    return Ratchet.Actions.register("new_folder", Ratchet.AbstractAction.extend({
+    return Ratchet.Actions.register("create-sample-space", Ratchet.AbstractAction.extend({
 
         defaultConfiguration: function()
         {
