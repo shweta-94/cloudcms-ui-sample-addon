@@ -9,7 +9,6 @@ define(function(require) {
     // action: "create-sample-space"
     require("./actions/sample/create-sample-space.js");
 
-
     // sample form fields
     // require("./fields/sample-city-picker.js");
     // require("./fields/sample-content-picker.js");
