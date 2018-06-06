@@ -8,6 +8,8 @@ define(function(require) {
 
     // action: "create-sample-space"
     require("./actions/sample/create-sample-space.js");
+    require("./actions/sample/create-journal.js");
+
 
     // sample form fields
     // require("./fields/sample-city-picker.js");
