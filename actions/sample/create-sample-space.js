@@ -1,110 +1,165 @@
 define(function(require, exports, module) {
 
-    var UI = require("ui");
-    var ContentHelpers = require("content-helpers");
+    var Ratchet = require("ratchet/ratchet");
+    var Actions = require("ratchet/actions");
+    var $ = require("jquery");
+    var OneTeam = require("oneteam");
 
-    return UI.registerAction("create-sample-space", UI.AbstractUIAction.extend({
+    return Ratchet.Actions.register("new_folder", Ratchet.AbstractAction.extend({
 
-        defaultConfiguration: function() {
-
+        defaultConfiguration: function()
+        {
             var config = this.base();
 
-            config.title = "Create Sample Space";
-            config.iconClass = "fa fa-plus";
+            config.title = "New Folder";
+            config.iconClass = "glyphicon glyphicon-plus";
+
             return config;
         },
 
-        prepareAction: function(actionContext, config, callback) {
-
-            actionContext.currentPath = actionContext.observable("path").get();
-
-            callback();
-        },
-
-        executeAction: function(actionContext, config, callback) {
-
+        execute: function(config, actionContext, callback)
+        {
             var self = this;
 
-            // define the form
-            var formConfig = {
-                "data": {
-                    "title": "My Sample Space",
-                    "description": "Description of my sample space"
-                },
-                "schema": {
-                    "type": "object",
-                    "properties": {
-                        "title": {
-                            "type": "string",
-                            "required": true
-                        },
-                        "description": {
-                            "type": "string"
-                        }
-                    }
-                },
-                "options": {
-                    "fields": {
-                        "title": {
-                            "type": "text",
-                            "label": "Title"
-                        },
-                        "description": {
-                            "type": "textarea",
-                            "label": "Description"
-                        }
-                    },
-                    "focus": "title"
-                }
-            };
+            OneTeam.project2ContentTypes(actionContext, false, function(contentTypeEntries) {
 
-            // render the form
-            UI.renderForm(actionContext, formConfig, function(form) {
-                // pop up a modal and render a form into the body
-                UI.showModal({
-                    "title": config.title,
-                    "form": form,
-                    "buttons": [{
-                        "id": "create",
-                        "title": "Create",
-                        "handler": function(e) {
-                            UI.showWaitModal("Creating the sample space...", function() {
-                                self.createHandler(actionContext, form.getValue(), function() {
-                                    UI.hideWaitModal();
-                                });
-                            });
-                        }
-                    }],
-                    "bindFormEnterKeyToButton": "create",
-                    "cancel": true
-                }, function(modalDiv) {
-                    // TODO: add any post-render logic here to manipulate the modal div
+                actionContext.model.typeEnum = [];
+                actionContext.model.typeOptionLabels = [];
+
+                for (var i = 0; i < contentTypeEntries.length; i++) {
+                    actionContext.model.typeEnum.push(contentTypeEntries[i].qname);
+                    actionContext.model.typeOptionLabels.push(contentTypeEntries[i].title);
+                }
+
+                self.doAction(actionContext, function (err, result) {
+                    callback(err, result);
                 });
             });
         },
 
-        createHandler: function(actionContext, props, callback)
+        doAction: function(actionContext, callback)
         {
-            ContentHelpers.addContent(actionContext, [{
-                "type": "folder",
-                "properties": props,
-                "parentFolderPath": actionContext.currentPath
-            }, {
-                "type": "folder",
-                "properties": {
-                    "title": "Files"
-                },
-                "parentFolderPath": actionContext.currentPath + "/" + props.title
-            }, {
-                "type": "file",
-                "properties": {
-                    "title": "helloworld.txt"
-                },
-                "parentFolderPath": actionContext.currentPath + "/" + props.title + "/Files",
-                "text": "Hello World!"
-            }], function(files) {
-                callback();
+            var self = this;
+
+            // modal dialog
+            Ratchet.fadeModal({
+                "title": "New Folder",
+                "cancel": true
+            }, function(div, renderCallback) {
+
+                // append the "Create" button
+                $(div).find('.modal-footer').append("<button class='btn btn-primary pull-right create'>Create</button>");
+
+                // body
+                $(div).find(".modal-body").html("");
+                $(div).find(".modal-body").append("<div class='form'></div>");
+
+                // form definition
+                var c = {
+                    "data": {
+                    },
+                    "schema": {
+                        "type": "object",
+                        "properties": {
+                            "title": {
+                                "type": "string",
+                                "required": true
+                            },
+                            "type": {
+                                "type": "string",
+                                "enum": actionContext.model.typeEnum,
+                                "default": "n:node",
+                                "required": true
+                            },
+                            "description": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "options": {
+                        "fields": {
+                            "title": {
+                                "type": "text",
+                                "label": "Title"
+                            },
+                            "type": {
+                                "type": "select",
+                                "label": "Folder Type",
+                                "optionLabels": actionContext.model.typeOptionLabels,
+                                "removeDefaultNone": true
+                            },
+                            "description": {
+                                "type": "textarea",
+                                "label": "Description"
+                            }
+                        }
+                    }
+                };
+
+                c.postRender = function(control)
+                {
+                    OneTeam.bindFormChildEnterClick(control, $(div).find(".create"));
+
+                    // create button
+                    $(div).find('.create').off().click(function(e) {
+
+                        e.preventDefault();
+
+                        OneTeam.processFormAction(control, div, function(value) {
+                            self.createFolder(value.title, value.description, value.type, actionContext, callback);
+                        });
+
+                    });
+
+                    OneTeam.bindTextFields(control, function() {
+                        $(div).find(".create").click();
+                    });
+
+                    renderCallback(function() {
+                        // TODO: anything?
+                    });
+                };
+
+                var _form = $(div).find(".form");
+                OneTeam.formCreate(_form, c);
             });
+        },
+
+        createFolder: function(title, description, typeQName, actionContext, callback)
+        {
+            var obj = {};
+            if (title) {
+                obj.title = title;
+            }
+            if (description) {
+                obj.description = description;
+            }
+
+            obj._features = {
+                "f:container": {
+                    "active": true
+                }
+            };
+
+            obj._type = "n:node";
+            if (typeQName) {
+                obj._type = typeQName;
+            }
+
+            var options = {
+                "rootNodeId": "root",
+                "parentFolderPath": actionContext.model.path,
+                "associationType": "a:child"
+            };
+
+            OneTeam.projectBranch(actionContext, function() {
+
+                // NOTE: this = branch
+                this.createNode(obj, options).then(function() {
+                    callback();
+                });
+            });
+
         }
 
     }));

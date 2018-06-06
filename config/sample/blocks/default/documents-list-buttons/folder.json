@@ -1,6 +1,4 @@
 {
-    "evaluator": "document-is-folder",
-    "condition": true,
     "config": {
         "documents-list-buttons": [{
             "key": "new",
